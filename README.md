@@ -28,7 +28,7 @@ Three example Hydra configs are provided for ÍTM. They are included as referenc
 | Config | Model | Setup |
 |--------|-------|-------|
 | `basic_decoupled_gcn.yaml` | Decoupled GCN | Supervised training on ÍTM data alone |
-| `multilingual_decoupled_gcn.yaml` | Decoupled GCN | Multilingual training with unified vocabulary; ÍTM added as a 7th language (`icl`) alongside datasets from 6 sign languages provided in matching pose format by the OpenHands authors [here](https://openhands.ai4bharat.org/en/latest/instructions/datasets.html)
+| `multilingual_decoupled_gcn.yaml` | Decoupled GCN | Multilingual training with unified vocabulary; ÍTM added as a 7th language (`icl`) alongside datasets from 6 sign languages provided in matching pose format by the OpenHands authors (see the [documentation](https://openhands.ai4bharat.org/en/latest/instructions/datasets.html))
 | `multilingual_original_vocab_st_gcn.yaml` | ST-GCN | Multilingual training with per-language vocabulary; ÍTM included alongside the same set of datasets |
 
 #### Experiment scripts (`experiment_scripts/`)
