@@ -2,7 +2,6 @@ import cv2
 import os, sys, gc
 import time
 import numpy as np
-import mediapipe as mp
 from tqdm.auto import tqdm
 import multiprocessing
 from joblib import Parallel, delayed
@@ -10,6 +9,11 @@ from natsort import natsorted
 from glob import glob
 import math
 import pickle
+import mediapipe
+if not hasattr(mediapipe, 'solutions'):
+    import mediapipe.python.solutions
+    mediapipe.solutions = mediapipe.python.solutions
+import mediapipe as mp
 
 mp_holistic = mp.solutions.holistic
 
@@ -53,13 +57,17 @@ def process_other_landmarks(component, n_points):
     return kps, conf
 
 
-def get_holistic_keypoints(
-    frames, holistic=mp_holistic.Holistic(static_image_mode=False, model_complexity=2)
-):
+def get_holistic_keypoints(frames, holistic=None):
     """
     For videos, it's optimal to create with `static_image_mode=False` for each video.
     https://google.github.io/mediapipe/solutions/holistic.html#static_image_mode
+
+    NOTE: holistic must NOT be a default argument (created at import time),
+    as mediapipe's CalculatorGraph is not picklable and will break joblib/loky.
+    Instead, instantiate fresh per call.
     """
+    if holistic is None:
+        holistic = mp_holistic.Holistic(static_image_mode=False, model_complexity=2)
 
     keypoints = []
     confs = []
@@ -117,11 +125,9 @@ def load_frames_from_video(video_path):
         if not success:
             break
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # img = cv2.resize(img, (640, 480))
         frames.append(img)
 
     vidcap.release()
-    # cv2.destroyAllWindows()
     return np.asarray(frames)
 
 
@@ -191,22 +197,35 @@ def dump_pose_for_dataset(
 
 
 if __name__ == "__main__":
-    # gen_keypoints_for_video("/home/gokulnc/data-disk/datasets/Chinese/CSL/word/color/000/P01_01_00_0._color.mp4", "sample.pkl")
     n_cores = multiprocessing.cpu_count()
+    print("Available cores: ", n_cores)
 
-    DIR = "AUTSL/train/"
-    SAVE_DIR = "AUTSL/holistic_poses/"
+    DIR = ""
+    SAVE_DIR = ""
 
     os.makedirs(SAVE_DIR, exist_ok=True)
 
     file_paths = []
     save_paths = []
-    for file in os.listdir(DIR):
-        if "color" in file:
-            file_paths.append(os.path.join(DIR, file))
-            save_paths.append(os.path.join(SAVE_DIR, file.replace(".mp4", "")))
+    existing_files = set(os.listdir(SAVE_DIR))
 
-    Parallel(n_jobs=n_cores, backend="loky")(
-        delayed(gen_keypoints_for_video)(path, save_path)
-        for path, save_path in tqdm(zip(file_paths, save_paths))
-    )
+    for file in os.listdir(DIR):
+        name = file.replace(".mp4", "")
+        if name + ".pkl" in existing_files:
+            #print(f"Skipping file: {file}")
+            continue
+        else:
+            file_paths.append(os.path.join(DIR, file))
+            save_paths.append(os.path.join(SAVE_DIR, name))
+
+    file_paths = sorted(file_paths)
+    save_paths = sorted(save_paths)
+
+    n_jobs = min(n_cores, 28)
+
+    Parallel(n_jobs=n_jobs, backend="loky")(
+         delayed(gen_keypoints_for_video)(path, save_path)
+         for path, save_path in tqdm(zip(file_paths, save_paths))
+     )
+#    for path, save_path in tqdm(zip(file_paths, save_paths)):
+ #       gen_keypoints_for_video(path, save_path)

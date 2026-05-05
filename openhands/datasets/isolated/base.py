@@ -42,6 +42,9 @@ class BaseIsolatedDataset(torch.utils.data.Dataset):
         # Windowing
         seq_len=1, # No. of frames per window
         num_seq=1, # No. of windows
+
+        # Augmentation
+        with_flipped_copies=False, # If True, every sample appears twice: original + horizontally flipped
     ):
         super().__init__()
 
@@ -58,15 +61,24 @@ class BaseIsolatedDataset(torch.utils.data.Dataset):
 
         self.normalized_class_mappings_file = normalized_class_mappings_file
         if normalized_class_mappings_file:
-            df = pd.read_csv(normalized_class_mappings_file, na_filter=False) # In German, "null" means "zero"
-            self.normalized_class_mappings = {df["actual_gloss"][i]: df["normalized_gloss"][i] for i in range(len(df))}
-            # TODO: Also store reverse mapping for inference in original lang
+            if normalized_class_mappings_file.endswith(".csv"):
+                df = pd.read_csv(normalized_class_mappings_file, na_filter=False)
+                self.normalized_class_mappings = {
+                    df["actual_gloss"][i]: df["normalized_gloss"][i]
+                    for i in range(len(df))
+                }
+            elif normalized_class_mappings_file.endswith(".json"):
+                import json
+
+                with open(normalized_class_mappings_file, "r", encoding="utf-8") as f:
+                    cls_map_data = json.load(f)
+                    self.normalized_class_mappings = {i["word_label"]: i["word_label"].upper() for i in cls_map_data}
         
         self.glosses = []
         self.read_glosses()
         if not self.glosses:
             raise RuntimeError("Unable to read glosses list")
-        print(f"Found {len(self.glosses)} classes in {splits} splits")
+        print(f"Found {len(self.glosses)} classes in {splits} splits [{self.__class__.__name__}]")
 
         self.gloss_to_id = {gloss: i for i, gloss in enumerate(self.glosses)}
         self.id_to_gloss = {i: gloss for i, gloss in enumerate(self.glosses)}
@@ -76,7 +88,7 @@ class BaseIsolatedDataset(torch.utils.data.Dataset):
 
         if not only_metadata:
             self.data = []
-            
+
             if inference_mode:
                 # Will have null labels
                 self.enumerate_data_files(self.root_dir)
@@ -84,6 +96,15 @@ class BaseIsolatedDataset(torch.utils.data.Dataset):
                 self.read_original_dataset()
             if not self.data:
                 raise RuntimeError("No data found")
+
+            # Extend with horizontally flipped copies.
+            # Flip flags are stored separately to avoid disturbing the data tuple
+            # format that ConcatDataset and multilingual pipelines depend on.
+            n = len(self.data)
+            self.flip_flags = [False] * n
+            if with_flipped_copies:
+                self.data = self.data + self.data  # original entries reused; flip flag distinguishes them
+                self.flip_flags = self.flip_flags + [True] * n
 
         self.cv_resize_dims = cv_resize_dims
         self.pose_use_confidence_scores = pose_use_confidence_scores
@@ -181,36 +202,89 @@ class BaseIsolatedDataset(torch.utils.data.Dataset):
         - If pose modality, generate `.pkl` files for all videos in folder.
           - If no videos present, check if some `.pkl` files already exist
         """
-        files = list_all_videos(dir)
-
+        if not dir:
+            return
         if self.modality == "pose":
             holistic = None
             pose_files = []
 
-            for video_file in files:
-                pose_file = os.path.splitext(video_file)[0] + ".pkl"
-                if not os.path.isfile(pose_file):
-                    # If pose is not cached, generate and store it.
-                    if not holistic:
-                        # Create MediaPipe instance
-                        from ..pipelines.generate_pose import MediaPipePoseGenerator
-                        holistic = MediaPipePoseGenerator()
-                    # Dump keypoints
-                    frames = load_frames_from_video(video_file)
-                    holistic.generate_keypoints_for_frames(frames, pose_file)
-                    
-                pose_files.append(pose_file)
-            
-            if not pose_files:
-                pose_files = list_all_files(dir, extensions=[".pkl"])
-            
+            # Determine which subdirectories to search
+            if "GSL" in self.__class__.__name__ or "MSASL" in self.__class__.__name__:
+                # GSL: pkl files in one level of subdirectories
+                search_dirs = [
+                    os.path.join(dir, sub)
+                    for sub in os.listdir(dir)
+                    if os.path.isdir(os.path.join(dir, sub))
+                ]
+            elif "INCLUDE" in self.__class__.__name__:
+                # INCLUDE/MSLASL: pkl files two levels deep (category/gloss/)
+                search_dirs = []
+                for category in os.listdir(dir):
+                    category_path = os.path.join(dir, category)
+                    if os.path.isdir(category_path):
+                        for gloss in os.listdir(category_path):
+                            gloss_path = os.path.join(category_path, gloss)
+                            if os.path.isdir(gloss_path):
+                                search_dirs.append(gloss_path)
+            else:
+                search_dirs = [dir]
+
+            for search_dir in search_dirs:
+                files = list_all_videos(search_dir)
+
+                for video_file in files:
+                    pose_file = os.path.splitext(video_file)[0] + ".pkl"
+                    if not os.path.isfile(pose_file):
+                        if not holistic:
+                            from ..pipelines.generate_pose import MediaPipePoseGenerator
+                            holistic = MediaPipePoseGenerator()
+                        frames = load_frames_from_video(video_file)
+                        holistic.generate_keypoints_for_frames(frames, pose_file)
+                    pose_files.append(pose_file)
+
+                # Fallback: collect pre-existing pkl files in this dir if no videos found
+                if not files:
+                    pose_files.extend(list_all_files(search_dir, extensions=[".pkl"]))
+
             files = pose_files
-        
+
+        else:
+            files = list_all_videos(dir)
+
         if not files:
             raise RuntimeError(f"No files found in {dir}")
-        
+
         self.data = [(f, -1) for f in files]
-        # -1 means invalid label_id
+    #     files = list_all_videos(dir)
+
+    #     if self.modality == "pose":
+    #         holistic = None
+    #         pose_files = []
+
+    #         for video_file in files:
+    #             pose_file = os.path.splitext(video_file)[0] + ".pkl"
+    #             if not os.path.isfile(pose_file):
+    #                 # If pose is not cached, generate and store it.
+    #                 if not holistic:
+    #                     # Create MediaPipe instance
+    #                     from ..pipelines.generate_pose import MediaPipePoseGenerator
+    #                     holistic = MediaPipePoseGenerator()
+    #                 # Dump keypoints
+    #                 frames = load_frames_from_video(video_file)
+    #                 holistic.generate_keypoints_for_frames(frames, pose_file)
+                    
+    #             pose_files.append(pose_file)
+            
+    #         if not pose_files:
+    #             pose_files = list_all_files(dir, extensions=[".pkl"])
+            
+    #         files = pose_files
+        
+    #     if not files:
+    #         raise RuntimeError(f"No files found in {dir}")
+        
+    #     self.data = [(f, -1) for f in files]
+    #     # -1 means invalid label_id
 
     def __len__(self):
         return len(self.data)
@@ -324,6 +398,13 @@ class BaseIsolatedDataset(torch.utils.data.Dataset):
             "lang_code": data["lang_code"] if self.multilingual else None, # Required for lang_token prepend
             "dataset_name": data["dataset_name"] if self.multilingual else None, # Required to calc dataset-wise accuracy
         }
+
+        # Apply horizontal flip before the transform pipeline so that it runs
+        # before PrependLangCodeOHE (which adds a temporal frame whose vertices
+        # must not be treated as spatial keypoints).
+        if getattr(self, "flip_flags", None) and self.flip_flags[index]:
+            from ..pose_transforms import HorizontalFlip
+            data = HorizontalFlip(p=1.0)(data)
 
         if self.transforms is not None:
             data = self.transforms(data)

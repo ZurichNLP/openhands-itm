@@ -322,34 +322,80 @@ class STModel(nn.Module):
         self.data_bn = nn.BatchNorm1d(in_channels * A.size(1))
         kwargs0 = {k: v for k, v in kwargs.items() if k != "dropout"}
         self.st_gcn_networks = nn.ModuleList(
-            (
-                st_gcn(
-                    in_channels,
-                    hidden_channels,
-                    kernel_size,
-                    1,
-                    residual=False,
-                    **kwargs0
-                ),
-                st_gcn(hidden_channels, hidden_channels, kernel_size, 1, **kwargs),
-                st_gcn(hidden_channels, hidden_channels, kernel_size, 1, **kwargs),
-                st_gcn(hidden_channels, hidden_channels, kernel_size, 1, **kwargs),
-                st_gcn(hidden_channels, hidden_channels * 2, kernel_size, 2, **kwargs),
-                st_gcn(
-                    hidden_channels * 2, hidden_channels * 2, kernel_size, 1, **kwargs
-                ),
-                st_gcn(
-                    hidden_channels * 2, hidden_channels * 2, kernel_size, 1, **kwargs
-                ),
-                st_gcn(
-                    hidden_channels * 2, hidden_channels * 4, kernel_size, 2, **kwargs
-                ),
-                st_gcn(
-                    hidden_channels * 4, hidden_channels * 4, kernel_size, 1, **kwargs
-                ),
-                st_gcn(hidden_channels * 4, hidden_dim, kernel_size, 1, **kwargs),
-            )
+        (
+            st_gcn(
+                in_channels=in_channels,
+                out_channels=hidden_channels,
+                kernel_size=kernel_size,
+                stride=1,
+                residual=False,
+                **kwargs0
+            ),
+            st_gcn(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels * 2,
+                kernel_size=kernel_size,
+                stride=2,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels * 2,
+                out_channels=hidden_channels * 2,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels * 2,
+                out_channels=hidden_channels * 2,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels * 2,
+                out_channels=hidden_channels * 4,
+                kernel_size=kernel_size,
+                stride=2,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels * 4,
+                out_channels=hidden_channels * 4,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            st_gcn(
+                in_channels=hidden_channels * 4,
+                out_channels=hidden_dim,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
         )
+    )
 
         # initialize parameters for edge importance weighting
         if edge_importance_weighting:

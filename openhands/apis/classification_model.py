@@ -29,7 +29,7 @@ class ClassificationModel(InferenceModel):
         y_hat = self.model(batch["frames"])
         loss = self.loss(y_hat, batch["labels"])
         acc = self.accuracy_metric(F.softmax(y_hat, dim=-1), batch["labels"])
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
         return {"loss": loss, "train_acc": acc}
 

@@ -23,14 +23,17 @@ class DataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         if stage == "fit":
             self.train_dataset = self._instantiate_dataset(self.data_cfg.train_pipeline)
-            self.valid_dataset = self._instantiate_dataset(self.data_cfg.valid_pipeline)
             print("Train set size:", len(self.train_dataset))
-            print("Valid set size:", len(self.valid_dataset))
-
-            assert self.train_dataset.in_channels == self.valid_dataset.in_channels
-            self.in_channels = self.valid_dataset.in_channels
-            assert self.train_dataset.num_class == self.valid_dataset.num_class
-            self.num_class = self.valid_dataset.num_class
+            if "valid_pipeline" in self.data_cfg:
+                self.valid_dataset = self._instantiate_dataset(self.data_cfg.valid_pipeline)
+                print("Valid set size:", len(self.valid_dataset))
+                assert self.train_dataset.in_channels == self.valid_dataset.in_channels
+                assert self.train_dataset.num_class == self.valid_dataset.num_class
+            else:
+                self.valid_dataset = self.train_dataset
+                print("No valid_pipeline found — reusing train dataset for validation.")
+            self.in_channels = self.train_dataset.in_channels
+            self.num_class = self.train_dataset.num_class
         elif stage == "test":
             self.test_dataset = self._instantiate_dataset(self.data_cfg.test_pipeline)
 
@@ -48,8 +51,9 @@ class DataModule(pl.LightningDataModule):
         return dataloader
 
     def val_dataloader(self):
+        pipeline_cfg = self.data_cfg.valid_pipeline if "valid_pipeline" in self.data_cfg else self.data_cfg.train_pipeline
         dataloader = hydra.utils.instantiate(
-            self.data_cfg.valid_pipeline.dataloader,
+            pipeline_cfg.dataloader,
             dataset=self.valid_dataset,
             collate_fn=self.valid_dataset.collate_fn,
         )

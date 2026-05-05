@@ -1,4 +1,4 @@
-PKL_FOLDER = "ISH-News/corrected_pose_no_sub_one_min_splits"
+PKL_FOLDER = "/home/fingim/master/data/itm_pretrain_poses"
 output_hdf5 = PKL_FOLDER.rstrip("/") + ".h5"
 
 # Get all pkl files

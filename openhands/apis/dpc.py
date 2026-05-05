@@ -204,12 +204,18 @@ class PretrainingModelDPC(pl.LightningModule):
         """
         Method to be called to start the training.
         """
+        try:
+            import wandb
+            logger = pl.loggers.WandbLogger()
+        except (ModuleNotFoundError, ImportError):
+            logger = True  # default TensorBoard logger
+
         self.trainer = pl.Trainer(
             gpus=1,
             #precision=16,
             max_epochs=self.max_epochs,
             default_root_dir=self.output_path,
-            logger=pl.loggers.WandbLogger(),
+            logger=logger,
             gradient_clip_val=self.hparams.get("gradient_clip_val", 1),
             callbacks=[self.checkpoint_callback],
             resume_from_checkpoint=self.resume_from_checkpoint,

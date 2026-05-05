@@ -5,3 +5,5 @@ default/
 dist/
 *.egg-info/
 *.zip
+experiments/
+*.out

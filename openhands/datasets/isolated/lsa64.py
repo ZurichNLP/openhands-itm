@@ -14,8 +14,8 @@ class LSA64Dataset(BaseIsolatedDataset):
     lang_code = "aed"
 
     def read_glosses(self):
-        df = pd.read_csv(self.class_mappings_file_path, delimiter="|", header=None)
-        self.glosses = [df[1][i].strip() for i in range(len(df))]
+        df = pd.read_csv(self.class_mappings_file_path, delimiter="|", header=None, na_filter=False)
+        self.glosses = [df[1][i] for i in range(len(df))]
 
     def read_original_dataset(self):
         """

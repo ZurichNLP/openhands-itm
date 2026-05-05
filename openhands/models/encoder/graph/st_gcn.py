@@ -172,19 +172,80 @@ class STGCN(nn.Module):
         self.data_bn = nn.BatchNorm1d(in_channels * A.size(1))
         kwargs0 = {k: v for k, v in kwargs.items() if k != "dropout"}
         self.st_gcn_networks = nn.ModuleList(
-            (
-                STGCN_BLOCK(in_channels, 64, kernel_size, 1, residual=False, **kwargs0),
-                STGCN_BLOCK(64, 64, kernel_size, 1, **kwargs),
-                STGCN_BLOCK(64, 64, kernel_size, 1, **kwargs),
-                STGCN_BLOCK(64, 64, kernel_size, 1, **kwargs),
-                STGCN_BLOCK(64, 128, kernel_size, 2, **kwargs),
-                STGCN_BLOCK(128, 128, kernel_size, 1, **kwargs),
-                STGCN_BLOCK(128, 128, kernel_size, 1, **kwargs),
-                STGCN_BLOCK(128, 256, kernel_size, 2, **kwargs),
-                STGCN_BLOCK(256, 256, kernel_size, 1, **kwargs),
-                STGCN_BLOCK(256, self.n_out_features, kernel_size, 1, **kwargs),
-            )
+        (
+            STGCN_BLOCK(
+                in_channels=in_channels,
+                out_channels=64,
+                kernel_size=kernel_size,
+                stride=1,
+                residual=False,
+                **kwargs0
+            ),
+            STGCN_BLOCK(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=64,
+                out_channels=128,
+                kernel_size=kernel_size,
+                stride=2,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=128,
+                out_channels=256,
+                kernel_size=kernel_size,
+                stride=2,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=256,
+                out_channels=256,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
+            STGCN_BLOCK(
+                in_channels=256,
+                out_channels=self.n_out_features,
+                kernel_size=kernel_size,
+                stride=1,
+                **kwargs
+            ),
         )
+    )
 
         if edge_importance_weighting:
             self.edge_importance = nn.ParameterList(

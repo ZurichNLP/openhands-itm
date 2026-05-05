@@ -563,6 +563,66 @@ class FrameSkipping:
         return data
 
 
+class HorizontalFlip:
+    """
+    Randomly flips the pose horizontally (mirrors left/right) with probability p.
+
+    For pose data this requires two steps:
+      1. Negate the x-coordinates (channel 0), which mirrors the skeleton around
+         the vertical axis. This works correctly after CenterAndScaleNormalize,
+         where x=0 is the body midpoint.
+      2. Swap the left/right keypoint pairs so the skeleton anatomy stays consistent
+         (e.g. what was the left hand is now in the right-hand position and relabeled
+         as the right hand).
+
+    Only the ``mediapipe_holistic_minimal_27`` keypoint layout is supported.
+    Apply this transform after CenterAndScaleNormalize and before PrependLangCodeOHE.
+
+    Args:
+        p (float): probability of applying the flip. Default: 0.5
+    """
+
+    # Swap pairs for the mediapipe_holistic_minimal_27 preset (post-PoseSelect indices)
+    # Each tuple is (left_index, right_index)
+    FLIP_PAIRS_MINIMAL_27 = [
+        (1, 2),   # left eye       <-> right eye
+        (3, 4),   # left shoulder  <-> right shoulder
+        (5, 6),   # left elbow     <-> right elbow
+        (7, 17),  # left wrist     <-> right wrist
+        (8, 18),  # left index MCP <-> right index MCP
+        (9, 19),  # left index PIP <-> right index PIP
+        (10, 20), # left mid MCP   <-> right mid MCP
+        (11, 21), # left mid PIP   <-> right mid PIP
+        (12, 22), # left ring MCP  <-> right ring MCP
+        (13, 23), # left ring PIP  <-> right ring PIP
+        (14, 24), # left pinky MCP <-> right pinky MCP
+        (15, 25), # left pinky PIP <-> right pinky PIP
+        (16, 26), # left thumb tip <-> right thumb tip
+    ]
+
+    def __init__(self, p: float = 0.5):
+        self.p = p
+
+    def __call__(self, data: dict):
+        if random.random() >= self.p:
+            return data
+
+        x = data["frames"]  # (C, T, V)
+        assert x.shape[0] == 2, "Only 2-channel (x, y) inputs supported for HorizontalFlip"
+
+        x = x.clone()
+
+        # Step 1: mirror x-coordinates
+        x[0] = -x[0]
+
+        # Step 2: swap left/right keypoint pairs
+        for left, right in self.FLIP_PAIRS_MINIMAL_27:
+            x[:, :, left], x[:, :, right] = x[:, :, right].clone(), x[:, :, left].clone()
+
+        data["frames"] = x
+        return data
+
+
 class AddClsToken:
     # Warning: Do not add any transforms after this
     def __call__(self, data):

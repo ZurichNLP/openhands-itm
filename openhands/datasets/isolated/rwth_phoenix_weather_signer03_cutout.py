@@ -23,20 +23,22 @@ class RWTH_Phoenix_Signer03_Dataset(BaseIsolatedDataset):
             Bs_data = BeautifulSoup(data, "lxml")
             glosses = Bs_data.find_all('orth')
             for gloss in glosses:
-                s.add(gloss.text.strip(' \n\t'))
+                s.add(gloss.text.strip())
         self.glosses = s
 
 
     def read_original_dataset(self):
-        df = pd.read_csv(self.split_file, header=None)
-
         with open(self.split_file, 'r') as f:
             data = f.read()
             Bs_data = BeautifulSoup(data, "xml")
             filenames = Bs_data.find_all('recording')
             glosses = Bs_data.find_all('orth')
 
+            unique_glosses = sorted(set(g.text.strip() for g in glosses))
+            self.gloss_to_id = {gloss: idx for idx, gloss in enumerate(unique_glosses)}
+
             for filename, gloss in zip(filenames, glosses):
-                gloss_cat = self.gloss_to_id[gloss.text.strip(' \n\t')]
+                key = gloss.text.strip()
+                gloss_cat = self.gloss_to_id[key]
                 instance_entry = filename.get('name'), gloss_cat
                 self.data.append(instance_entry)

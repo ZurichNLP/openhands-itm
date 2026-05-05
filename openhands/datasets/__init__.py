@@ -5,6 +5,7 @@ from .isolated import (
     GSLDataset,
     INCLUDEDataset,
     WLASLDataset,
+    ITMDataset,
 )
 from .pose_transforms import (
     Compose,
@@ -21,6 +22,7 @@ from .pose_transforms import (
     TemporalSample,
     FrameSkipping,
     AddClsToken,
+    HorizontalFlip,
 )
 from .video_transforms import (
     Compose,

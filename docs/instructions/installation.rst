@@ -6,7 +6,7 @@ This section describes how to install 👐OpenHands and ensure it is working.
 Getting the toolkit
 -------------------
 
-- Ensure you have Python 3.7+ installed.
+- Ensure you have Python 3.10+ installed.
 - 👐OpenHands can either be installed directly using package manager, or built from source.
 
 Installing from PyPI
@@ -27,7 +27,7 @@ Run the following commands:
 
 	$ git clone https://github.com/AI4Bharat/OpenHands
 	$ cd OpenHands/
-	$ python setup.py install
+	$ pip install .
 
 
 Checking Installation
