@@ -42,11 +42,43 @@ Matching Python training/testing scripts and SLURM shell scripts are provided fo
 | `multilingual_original/` | Multilingual training with per-language vocabulary |
 | `pretrain_dpc_itm/` | Self-supervised DPC pretraining including ÍTM |
 
-#### Additional script (`scripts/`)
+#### Additional scripts (`scripts/`)
 
 - `visualize_pose.py` — visualizes pose estimates from pose .pkl files as overlay on an MP4 video
 
-### 3. Compatibility fixes (`exp_utils.py`)
+### 3. Multilingual inference (`openhands/apis/inference.py`)
+
+The original `InferenceModel` compared predicted class indices directly against ground-truth labels from the test dataloader. This works for monolingual models, but fails silently for multilingual ones: `ConcatDataset` maps every gloss to a **global** index during training (built by sorting the full union of all datasets' glosses), while each sub-dataset's own `id_to_gloss` only covers its local vocabulary. Without reconstruction of the global mapping at test time, every comparison produces a mismatch and accuracy is 0%.
+
+The updated `InferenceModel` handles this automatically when the `multilingual` flag is set in the test pipeline config:
+
+- **Global mapping reconstruction** — `_build_global_mapping()` replicates the exact logic of `ConcatDataset.read_glosses()`: it applies `lang_code__gloss` prefixing (or `normalized_class_mappings` normalization when `unify_vocabulary: true`) and sorts the union of all glosses alphabetically. This produces the same `gloss→id` mapping the model was trained against. The train pipeline config is used as the source so that the full training vocabulary is captured, not just the classes present in the test split.
+- **Sub-dataset reconstruction** — because `ConcatDataset` deletes `self.datasets` after `__init__`, the sub-datasets are re-instantiated from the config with `only_metadata=True` (skipping pose loading) and cached for the lifetime of the `InferenceModel`.
+- **Ground-truth labels** — `ConcatDataset.read_original_dataset()` already writes global indices into each sample, so no remapping is needed for GT; only predicted indices are resolved via the global mapping.
+- **Monolingual paths** — all three evaluation methods (`test_inference`, `compute_test_accuracy`, `compute_test_avg_class_accuracy`) are unchanged in behaviour when `multilingual` is not set.
+
+#### Required config change for multilingual testing
+
+Add `multilingual: true` under the test dataset block in your config:
+
+```yaml
+data:
+    test_pipeline:
+        dataset:
+            _target_: openhands.datasets.isolated.ConcatDataset
+            splits: "test"
+            inference_mode: false
+            multilingual: true        # <-- required for correct multilingual inference
+            unify_vocabulary: true    # must match the value used during training
+            datasets:
+                ...
+```
+
+Without this flag, `InferenceModel` falls back to the original monolingual behaviour and multilingual evaluation will produce 0% accuracy.
+
+---
+
+### 4. Compatibility fixes (`exp_utils.py`)
 
 The root-level `exp_utils.py` is a patched replacement for `openhands/core/exp_utils.py`, required for compatibility with PyTorch Lightning ≥ 1.8. The original used `LoggerCollection` and `logger_connector.configure_logger()`, both of which were removed in PL 1.8.
 
