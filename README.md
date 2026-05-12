@@ -78,7 +78,36 @@ Without this flag, `InferenceModel` falls back to the original monolingual behav
 
 ---
 
-### 4. Compatibility fixes (`exp_utils.py`)
+### 4. Optional validation pipeline (`openhands/core/data.py`)
+
+The original `DataModule.setup()` unconditionally instantiated a `valid_dataset` from `valid_pipeline`, so configs without that block would crash at startup. `valid_pipeline` is now optional.
+
+**Behaviour when `valid_pipeline` is omitted from the config:**
+
+- `valid_dataset` is set to the same object as `train_dataset` — the full training set is used for validation callbacks (loss, accuracy) during training.
+- `val_dataloader()` falls back to the `train_pipeline.dataloader` config for batch size and worker settings.
+- Validation still runs every epoch as normal; it is not skipped.
+
+This makes it straightforward to combine training and validation splits into a single training set (e.g. by pointing `train_pipeline` at a dataset file that merges both splits) without having to provide a dummy `valid_pipeline`.
+
+**Behaviour when `valid_pipeline` is present** is unchanged: a separate validation dataset is instantiated and the usual channel/class-count assertions are enforced.
+
+To use a combined train+val dataset, simply omit `valid_pipeline` from the config and point `train_pipeline` at the combined split:
+
+```yaml
+data:
+    train_pipeline:
+        dataset:
+            splits: "train+val"   # or whichever combined split file you use
+            ...
+    # valid_pipeline:             # omit entirely — train data used for val callbacks
+    test_pipeline:
+        ...
+```
+
+---
+
+### 5. Compatibility fixes (`exp_utils.py`)
 
 The root-level `exp_utils.py` is a patched replacement for `openhands/core/exp_utils.py`, required for compatibility with PyTorch Lightning ≥ 1.8. The original used `LoggerCollection` and `logger_connector.configure_logger()`, both of which were removed in PL 1.8.
 
