@@ -78,7 +78,22 @@ Without this flag, `InferenceModel` falls back to the original monolingual behav
 
 ---
 
-### 4. Subdirectory-aware inference-mode file enumeration (`openhands/datasets/isolated/base.py`)
+### 4. Per-sample prediction logging in `compute_test_accuracy`
+
+`compute_test_accuracy` currently prints every prediction to stdout as it runs:
+
+```python
+# openhands/apis/inference.py  ~line 246
+label = self._resolve_label(pred_index)
+filename = batch["files"][i]
+print(f"{label}:\t{filename}\t{score}")
+```
+
+This produces one line per test sample. To suppress it and only see the per-dataset accuracy summary, comment out those three lines.
+
+---
+
+### 5. Subdirectory-aware inference-mode file enumeration (`openhands/datasets/isolated/base.py`)
 
 The original `enumerate_data_files` assumed all pose `.pkl` files sit directly in `root_dir`. Several datasets in the multilingual setup store files in nested subdirectories, which caused `RuntimeError: No files found` at startup in inference mode. The method was updated to handle these structures:
 
@@ -94,7 +109,7 @@ Additional fixes applied in the same method:
 
 ---
 
-### 5. Optional validation pipeline (`openhands/core/data.py`)
+### 6. Optional validation pipeline (`openhands/core/data.py`)
 
 The original `DataModule.setup()` unconditionally instantiated a `valid_dataset` from `valid_pipeline`, so configs without that block would crash at startup. `valid_pipeline` is now optional.
 
@@ -123,7 +138,7 @@ data:
 
 ---
 
-### 6. Compatibility fixes (`exp_utils.py`)
+### 7. Compatibility fixes (`exp_utils.py`)
 
 The root-level `exp_utils.py` is a patched replacement for `openhands/core/exp_utils.py`, required for compatibility with PyTorch Lightning ≥ 1.8. The original used `LoggerCollection` and `logger_connector.configure_logger()`, both of which were removed in PL 1.8.
 
