@@ -78,7 +78,23 @@ Without this flag, `InferenceModel` falls back to the original monolingual behav
 
 ---
 
-### 4. Optional validation pipeline (`openhands/core/data.py`)
+### 4. Subdirectory-aware inference-mode file enumeration (`openhands/datasets/isolated/base.py`)
+
+The original `enumerate_data_files` assumed all pose `.pkl` files sit directly in `root_dir`. Several datasets in the multilingual setup store files in nested subdirectories, which caused `RuntimeError: No files found` at startup in inference mode. The method was updated to handle these structures:
+
+| Dataset | Structure | Handling |
+|---------|-----------|----------|
+| GSL, MSASL | `root_dir/<gloss>/` | One level of subdirectories enumerated |
+| INCLUDE | `root_dir/<category>/<gloss>/` | Two levels of subdirectories enumerated |
+| All others | `root_dir/` (flat) | Unchanged |
+
+Additional fixes applied in the same method:
+- **Empty `root_dir` guard** — `ConcatDataset` passes `root_dir=""` and its file enumeration is handled separately; the method now returns immediately when `dir` is empty rather than crashing.
+- **Per-directory `.pkl` fallback** — if a search directory contains no video files, any pre-existing `.pkl` files in that directory are collected directly. The fallback is now evaluated per directory and appends (`extend`) rather than replacing the accumulated list.
+
+---
+
+### 5. Optional validation pipeline (`openhands/core/data.py`)
 
 The original `DataModule.setup()` unconditionally instantiated a `valid_dataset` from `valid_pipeline`, so configs without that block would crash at startup. `valid_pipeline` is now optional.
 
@@ -107,7 +123,7 @@ data:
 
 ---
 
-### 5. Compatibility fixes (`exp_utils.py`)
+### 6. Compatibility fixes (`exp_utils.py`)
 
 The root-level `exp_utils.py` is a patched replacement for `openhands/core/exp_utils.py`, required for compatibility with PyTorch Lightning ≥ 1.8. The original used `LoggerCollection` and `logger_connector.configure_logger()`, both of which were removed in PL 1.8.
 
